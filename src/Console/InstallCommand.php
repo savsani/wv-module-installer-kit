@@ -94,7 +94,9 @@ class InstallCommand extends Command
     protected function markModuleEnabled(string $name): void
     {
         $statusesPath = base_path('modules_statuses.json');
-        $statuses = json_decode(file_get_contents($statusesPath), true) ?? [];
+        $statuses = file_exists($statusesPath)
+            ? (json_decode(file_get_contents($statusesPath), true) ?? [])
+            : [];
         $statuses[$name] = true;
         file_put_contents($statusesPath, json_encode($statuses, JSON_PRETTY_PRINT).PHP_EOL);
     }

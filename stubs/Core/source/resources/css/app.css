@@ -1,0 +1,252 @@
+@import 'tailwindcss';
+@import './color-picker.css';
+@import './rich-text-editor.css';
+
+@source '../../../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../../../storage/framework/views/*.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+    --color-brand-25: #f2f7ff;
+    --color-brand-50: #ecf3ff;
+    --color-brand-100: #dde9ff;
+    --color-brand-200: #c2d6ff;
+    --color-brand-300: #9cb9ff;
+    --color-brand-400: #7592ff;
+    --color-brand-500: #465fff;
+    --color-brand-600: #3641f5;
+    --color-brand-700: #2a31d8;
+    --color-brand-800: #252dae;
+    --color-brand-900: #262e89;
+    --color-brand-950: #161950;
+
+    /*
+     * Semantic roles (success/warning/danger/info) intentionally reuse
+     * Tailwind's default green/amber/red/sky palettes rather than a second
+     * custom-named scale — one color system, not two. To retheme a role
+     * app-wide (e.g. a different "danger" red), override that default
+     * Tailwind variable here, e.g. `--color-red-500: #...;`.
+     */
+
+    --radius-xs: 0.125rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --radius-3xl: 1.5rem;
+    --radius-4xl: 2rem;
+
+    --shadow-2xs: 0px 1px 0px 0px rgba(16, 24, 40, 0.05);
+    --shadow-xs: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+    --shadow-sm: 0px 1px 3px 0px rgba(16, 24, 40, 0.1), 0px 1px 2px 0px rgba(16, 24, 40, 0.06);
+    --shadow-md: 0px 4px 8px -2px rgba(16, 24, 40, 0.1), 0px 2px 4px -2px rgba(16, 24, 40, 0.06);
+    --shadow-lg: 0px 12px 16px -4px rgba(16, 24, 40, 0.08), 0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+    --shadow-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08), 0px 8px 8px -4px rgba(16, 24, 40, 0.03);
+    --shadow-2xl: 0px 24px 48px -12px rgba(16, 24, 40, 0.18);
+     
+    /*
+     * Radius/shadow: 2 shared families (control, card) + pill, no per-component
+     * vars. Each component has its own `.ui-*` class below, so retheming a
+     * family or moving a component is a one-line edit.
+     * --radius-pill is a literal 9999px (not var(--radius-full)) since Tailwind's
+     * `rounded-full` isn't backed by a --radius-* variable.
+     */
+    --radius-control: var(--radius-md);   /* 6px  — buttons, form inputs, badges, alerts, toast, tabs, pagination, icon/copy buttons, bulk-actions-bar */
+    --radius-card: var(--radius-xl);      /* 12px — card, modal, popover (empty-state too, radius only) */
+    --radius-pill: 9999px;                /* fully round — badge (pill), avatar, toggle knobs, icon circles */
+
+    --shadow-control: var(--shadow-xs);   /* buttons, toast at rest — NOT form inputs (border-first, no shadow by design, see `form-input` below) */
+    --shadow-card: var(--shadow-sm);      /* card, modal, popover — NOT empty-state (dashed placeholder, no elevation) */
+}
+
+/*
+ * Z-index scale, documented so new stacked UI slots into the right band
+ * instead of guessing a bigger number. Tailwind v4 has no themeable z-index
+ * namespace (unlike --color-*, --radius-*, --shadow-*), so these are plain
+ * custom properties consumed via arbitrary values, e.g. `z-[var(--z-modal)]`.
+ *
+ * 10  inline decorations (color-picker swatch)
+ * 40  popovers/menus anchored inline (form dropdowns, sidebar) — Tailwind's
+ *     own `z-40`/`z-50` utilities, used directly, no token needed
+ * 50  sticky header, nav dropdowns, teleported table menus — same reasoning
+ * 60  modal — var(--z-modal) below
+ * 70  toast stack — always above a modal — var(--z-toast) below
+ */
+:root {
+    --z-modal: 60;
+    --z-toast: 70;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Shared surface for auth cards, profile sections, and other bordered panels. */
+@utility ui-card {
+    @apply rounded-card border border-gray-200 bg-white shadow-card dark:border-gray-800 dark:bg-gray-900;
+}
+
+/* Modal panel — same family as `ui-card`, own class so it can diverge later. */
+@utility ui-modal {
+    @apply rounded-card border border-gray-200 bg-white shadow-card dark:border-gray-800 dark:bg-gray-900;
+}
+
+/* "Nothing here yet" placeholder — `ui-card` radius, no shadow/background (dashed border only). */
+@utility ui-empty-state {
+    @apply rounded-card border border-dashed border-gray-300 dark:border-gray-700;
+}
+
+/* Floating surface for dropdowns/popovers/modals — one shade lighter than `ui-card` in dark mode since it floats above a card. */
+@utility ui-popover {
+    @apply rounded-card border border-gray-200 bg-white shadow-card dark:border-gray-700 dark:bg-gray-800;
+}
+
+/*
+ * Form controls, border-first: no shadow, ever. `form-input` holds all
+ * non-color properties; `-default/-error/-success` variants own only border
+ * color/thickness (1px rest, 2px focus) — one place to retheme every field.
+ * Disabled = flat `opacity-60` fade, matching other disabled controls.
+ * Background matches `ui-card` in both themes so the border does the work;
+ * floating surfaces (popovers) are intentionally one shade lighter via `ui-popover`.
+ */
+@utility form-input {
+    /*
+     * `:read-only` scoping: CSS matches `:read-only` on any non-text-entry
+     * element (select, div) AND on disabled inputs, not just readonly ones.
+     * `:not(:disabled)` keeps the readonly bg off disabled fields, which
+     * already get `disabled:opacity-60`.
+     */
+    @apply w-full rounded-control border bg-white px-4 py-2.5 text-sm text-gray-900 transition placeholder:text-gray-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 [&:is(input,textarea):read-only:not(:disabled)]:bg-gray-50 [&:is(input,textarea):read-only:not(:disabled)]:text-gray-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:[&:is(input,textarea):read-only:not(:disabled)]:bg-gray-950/60;
+}
+
+@utility form-input-default {
+    @apply border-gray-300 focus:border-2 focus:border-brand-500 disabled:border-gray-200 [&:is(input,textarea):read-only:not(:disabled)]:border-gray-200 dark:border-gray-700 dark:focus:border-brand-400 dark:disabled:border-gray-800 dark:[&:is(input,textarea):read-only:not(:disabled)]:border-gray-700;
+}
+
+/* Same idle/focus border as form-input-default, for wrapper elements whose focusable control is a descendant (file-input label, number-stepper/time-input box). */
+@utility form-input-default-within {
+    @apply border-gray-300 focus-within:border-2 focus-within:border-brand-500 dark:border-gray-700 dark:focus-within:border-brand-400;
+}
+
+/* Error/success counterparts to form-input-default-within, for the same wrapper-element case. */
+@utility form-input-error-within {
+    @apply border-red-300 focus-within:border-2 focus-within:border-red-500 dark:border-red-800 dark:focus-within:border-red-500;
+}
+
+@utility form-input-success-within {
+    @apply border-green-300 focus-within:border-2 focus-within:border-green-500 dark:border-green-800 dark:focus-within:border-green-500;
+}
+
+@utility form-input-error {
+    @apply border-red-300 pr-10 focus:border-2 focus:border-red-500 dark:border-red-800 dark:focus:border-red-500;
+}
+
+@utility form-input-success {
+    @apply border-green-300 pr-10 focus:border-2 focus:border-green-500 dark:border-green-800 dark:focus:border-green-500;
+}
+
+/* Accent used by checkbox/radio/toggle "on" state — one place to change the accent color. */
+@utility form-accent-idle {
+    @apply border-gray-300 bg-transparent hover:border-brand-400 dark:border-gray-700 dark:hover:border-brand-300;
+}
+
+@utility form-accent-active {
+    @apply border-brand-600 bg-brand-600 dark:border-brand-500 dark:bg-brand-500;
+}
+
+/*
+ * Remaining components, all in the `--radius-control`/`--shadow-control`
+ * family. Own class per component for overridability + self-documenting
+ * markup; colors/padding stay inline as Tailwind utilities.
+ */
+@utility ui-button {
+    @apply rounded-control shadow-control;
+}
+
+@utility ui-badge {
+    @apply rounded-control; /* square variant only — pill variant uses rounded-pill directly */
+}
+
+@utility ui-alert {
+    @apply rounded-control;
+}
+
+@utility ui-toast {
+    @apply rounded-control shadow-control;
+}
+
+@utility ui-tabs {
+    @apply rounded-control;
+}
+
+@utility ui-pagination {
+    @apply rounded-control;
+}
+
+@utility ui-icon-button {
+    @apply rounded-control;
+}
+
+@utility ui-icon-toggle {
+    @apply rounded-control;
+}
+
+@utility ui-icon-toggle-group {
+    @apply rounded-control;
+}
+
+@utility ui-icon-toggle-dropdown {
+    @apply rounded-control;
+}
+
+@utility ui-copy-button {
+    @apply rounded-control;
+}
+
+@utility ui-bulk-actions-bar {
+    @apply rounded-control;
+}
+
+/* Thin, theme-matched scrollbar for dropdown option lists (select/multi-select/time segments). */
+@utility scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-gray-300) transparent;
+
+    :where(.dark, .dark *) & {
+        scrollbar-color: var(--color-gray-600) transparent;
+    }
+
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background-color: var(--color-gray-300);
+        border-radius: 9999px;
+    }
+
+    :where(.dark, .dark *) &::-webkit-scrollbar-thumb {
+        background-color: var(--color-gray-600);
+    }
+}
+
+/* Fully hidden scrollbar for scrollable containers (sidebar nav) that should still scroll on overflow. */
+@utility scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+

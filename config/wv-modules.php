@@ -24,6 +24,22 @@ return [
             'target' => 'Modules/Auth',
             'npm' => null,
         ],
+        'admin' => [
+            'name' => 'Admin',
+            'description' => 'User, role, and permission management, user impersonation, and a module manager UI.',
+            'depends_on' => ['core', 'auth'],
+            'path' => 'Admin',
+            'target' => 'Modules/Admin',
+            'npm' => null,
+        ],
+        'activitylog' => [
+            'name' => 'ActivityLog',
+            'description' => 'Records and displays an audit trail of actions across the app, decoupled from other modules via a shared event.',
+            'depends_on' => ['core'],
+            'path' => 'ActivityLog',
+            'target' => 'Modules/ActivityLog',
+            'npm' => null,
+        ],
     ],
 
 ];

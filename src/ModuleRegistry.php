@@ -8,18 +8,21 @@ use InvalidArgumentException;
 class ModuleRegistry
 {
     /**
-     * @var Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, source: string, npm: ?string, version: string}>|null
+     * @var Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, npm: ?string}>|null
      */
     protected ?Collection $modules = null;
 
-    public function __construct(protected string $stubsPath) {}
+    /**
+     * @param  array<string, array{name: string, description?: string, depends_on?: array<int, string>, target: string, repo: string, ref?: string, npm?: string}>  $config
+     */
+    public function __construct(protected array $config) {}
 
     /**
-     * Every module this package ships, discovered from stubs/*\/wv-module.json.
-     * Adding a new module later is dropping a folder here — nothing to
+     * Every module this package knows how to install, from config/wv-modules.php.
+     * Adding a new module later is adding an entry here — nothing else to
      * register centrally.
      *
-     * @return Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, source: string, npm: ?string, version: string}>
+     * @return Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, npm: ?string}>
      */
     public function all(): Collection
     {
@@ -27,11 +30,17 @@ class ModuleRegistry
             return $this->modules;
         }
 
-        $descriptors = glob($this->stubsPath.'/*/wv-module.json') ?: [];
-
-        return $this->modules = collect($descriptors)
-            ->map(fn (string $path) => $this->describe($path))
-            ->keyBy('key');
+        return $this->modules = collect($this->config)
+            ->map(fn (array $module, string $key) => [
+                'key' => $key,
+                'name' => $module['name'],
+                'description' => $module['description'] ?? '',
+                'depends_on' => $module['depends_on'] ?? [],
+                'repo' => $module['repo'],
+                'ref' => $module['ref'] ?? 'main',
+                'target' => $module['target'],
+                'npm' => $module['npm'] ?? null,
+            ]);
     }
 
     public function find(string $key): ?array
@@ -45,7 +54,7 @@ class ModuleRegistry
      * `wv:install auth` also pulls in `core` first once Auth ships.
      *
      * @param  array<int, string>  $keys
-     * @return array<int, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, source: string, npm: ?string, version: string}>
+     * @return array<int, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, npm: ?string}>
      */
     public function resolveWithDependencies(array $keys): array
     {
@@ -77,25 +86,5 @@ class ModuleRegistry
         }
 
         return $resolved;
-    }
-
-    /**
-     * @return array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, source: string, npm: ?string, version: string}
-     */
-    protected function describe(string $descriptorPath): array
-    {
-        $moduleDir = dirname($descriptorPath);
-        $descriptor = json_decode(file_get_contents($descriptorPath), true);
-
-        return [
-            'key' => $descriptor['key'],
-            'name' => $descriptor['name'],
-            'description' => $descriptor['description'] ?? '',
-            'depends_on' => $descriptor['depends_on'] ?? [],
-            'source' => $moduleDir.'/'.($descriptor['source'] ?? 'source'),
-            'target' => $descriptor['target'],
-            'npm' => isset($descriptor['npm']) ? $moduleDir.'/'.$descriptor['npm'] : null,
-            'version' => $descriptor['version'] ?? '0.1.0',
-        ];
     }
 }

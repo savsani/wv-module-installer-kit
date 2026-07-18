@@ -11,12 +11,21 @@ class ModuleInstallerKitServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(ModuleRegistry::class, fn () => new ModuleRegistry(__DIR__.'/../stubs'));
+        $this->mergeConfigFrom(__DIR__.'/../config/wv-modules.php', 'wv-modules');
+
+        $this->app->singleton(
+            ModuleRegistry::class,
+            fn ($app) => new ModuleRegistry($app['config']->get('wv-modules'))
+        );
     }
 
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__.'/../config/wv-modules.php' => config_path('wv-modules.php'),
+            ], 'wv-modules-config');
+
             $this->commands([
                 InstallCommand::class,
                 UpdateCommand::class,

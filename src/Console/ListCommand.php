@@ -16,20 +16,20 @@ class ListCommand extends Command
     {
         $rows = $registry->all()->map(function (array $module) use ($files) {
             $manifestPath = base_path($module['target']).'/.wv-manifest.json';
-            $installedVersion = $files->exists($manifestPath)
-                ? json_decode($files->get($manifestPath), true)['package_version'] ?? 'unknown'
+            $installedCommit = $files->exists($manifestPath)
+                ? json_decode($files->get($manifestPath), true)['commit'] ?? 'unknown'
                 : null;
 
             return [
                 $module['key'],
                 $module['name'],
                 $module['depends_on'] === [] ? '—' : implode(', ', $module['depends_on']),
-                $installedVersion === null ? 'not installed' : "installed ({$installedVersion})",
-                $module['version'],
+                $installedCommit === null ? 'not installed' : 'installed ('.substr($installedCommit, 0, 10).')',
+                $module['repo'].'@'.$module['ref'],
             ];
         })->all();
 
-        $this->table(['Key', 'Name', 'Depends on', 'Status', 'Available version'], $rows);
+        $this->table(['Key', 'Name', 'Depends on', 'Status', 'Source'], $rows);
 
         return self::SUCCESS;
     }

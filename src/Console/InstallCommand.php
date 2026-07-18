@@ -9,6 +9,7 @@ use Wv\ModuleInstallerKit\ModuleRegistry;
 use Wv\ModuleInstallerKit\Support\ComposerConfigPatcher;
 use Wv\ModuleInstallerKit\Support\ManifestWriter;
 use Wv\ModuleInstallerKit\Support\NodeDependencyMerger;
+use Wv\ModuleInstallerKit\Support\RepositoryFetcher;
 use Wv\ModuleInstallerKit\Support\StubCopier;
 use Wv\ModuleInstallerKit\Support\ViteConfigPatcher;
 
@@ -16,13 +17,14 @@ class InstallCommand extends Command
 {
     protected $signature = 'wv:install
         {modules?* : Module keys to install, e.g. "core". Omit and pass --all to install everything}
-        {--all : Install every module this package ships}
+        {--all : Install every module this package knows about}
         {--force : Overwrite the module directory if it already exists}';
 
-    protected $description = "Copy one or more Wv modules into this app's Modules/ directory";
+    protected $description = "Fetch one or more Wv modules from their GitHub repos and copy them into this app's Modules/ directory";
 
     public function handle(
         ModuleRegistry $registry,
+        RepositoryFetcher $fetcher,
         StubCopier $copier,
         ManifestWriter $manifest,
         NodeDependencyMerger $nodeDeps,
@@ -56,19 +58,28 @@ class InstallCommand extends Command
                 continue;
             }
 
-            $copier->copy($module['source'], $target);
-            $manifest->write($target, $module['key'], $module['version']);
-            $this->markModuleEnabled($module['name']);
+            $this->info("Fetching {$module['name']} from {$module['repo']}@{$module['ref']}...");
+            $fetched = $fetcher->fetch($module['repo'], $module['ref']);
 
-            if ($module['npm'] && $nodeDeps->merge(base_path('package.json'), $module['npm'])) {
-                $packageJsonChanged = true;
+            try {
+                $copier->copy($fetched['path'].'/source', $target);
+                $manifest->write($target, $module['key'], $fetched['commit']);
+
+                $npmDeps = $module['npm'] ? $fetched['path'].'/'.$module['npm'] : null;
+
+                if ($npmDeps && $nodeDeps->merge(base_path('package.json'), $npmDeps)) {
+                    $packageJsonChanged = true;
+                }
+
+                $vite->patch(base_path('vite.config.js'), [
+                    "Modules/{$module['name']}/resources/css/app.css",
+                    "Modules/{$module['name']}/resources/js/app.js",
+                ]);
+            } finally {
+                $files->deleteDirectory($fetched['path']);
             }
 
-            $vite->patch(base_path('vite.config.js'), [
-                "Modules/{$module['name']}/resources/css/app.css",
-                "Modules/{$module['name']}/resources/js/app.js",
-            ]);
-
+            $this->markModuleEnabled($module['name']);
             $installed[] = $module['name'];
         }
 

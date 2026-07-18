@@ -26,7 +26,7 @@ return [
         ],
         'admin' => [
             'name' => 'Admin',
-            'description' => 'User, role, and permission management, user impersonation, and a module manager UI.',
+            'description' => 'User, role, and permission management, and user impersonation.',
             'depends_on' => ['core', 'auth'],
             'path' => 'Admin',
             'target' => 'Modules/Admin',
@@ -38,6 +38,14 @@ return [
             'depends_on' => ['core'],
             'path' => 'ActivityLog',
             'target' => 'Modules/ActivityLog',
+            'npm' => null,
+        ],
+        'modulemanager' => [
+            'name' => 'ModuleManager',
+            'description' => 'Web UI for listing, installing, and updating Wv modules and running their migrations — no terminal access needed in production.',
+            'depends_on' => ['core', 'auth', 'admin'],
+            'path' => 'ModuleManager',
+            'target' => 'Modules/ModuleManager',
             'npm' => null,
         ],
     ],

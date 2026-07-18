@@ -16,6 +16,14 @@ return [
             'target' => 'Modules/Core',
             'npm' => 'package.deps.json',
         ],
+        'auth' => [
+            'name' => 'Auth',
+            'description' => 'Fortify-backed authentication: login, registration, password reset/confirmation, email verification, two-factor auth, and profile management.',
+            'depends_on' => ['core'],
+            'path' => 'Auth',
+            'target' => 'Modules/Auth',
+            'npm' => null,
+        ],
     ],
 
 ];

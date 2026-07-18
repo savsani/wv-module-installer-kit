@@ -7,23 +7,25 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Process;
 use Wv\ModuleInstallerKit\ModuleRegistry;
 use Wv\ModuleInstallerKit\Support\ManifestWriter;
+use Wv\ModuleInstallerKit\Support\ModuleVersionChecker;
 use Wv\ModuleInstallerKit\Support\NodeDependencyMerger;
-use Wv\ModuleInstallerKit\Support\RepositoryFetcher;
 use Wv\ModuleInstallerKit\Support\StubCopier;
 use Wv\ModuleInstallerKit\Support\ViteConfigPatcher;
+use Wv\ModuleInstallerKit\Support\ZipFetcher;
 
 class UpdateCommand extends Command
 {
     protected $signature = 'wv:update
         {modules?* : Module keys to update, e.g. "core". Omit and pass --all to update everything installed}
         {--all : Update every module this package knows about that is currently installed}
-        {--force : Skip the confirmation prompt}';
+        {--force : Re-copy even if the installed version already matches the latest, and skip the confirmation prompt}';
 
-    protected $description = "Re-fetch installed Wv modules from their GitHub repos, overwriting the copy in Modules/";
+    protected $description = 'Update installed Wv modules whose version has changed since they were installed';
 
     public function handle(
         ModuleRegistry $registry,
-        RepositoryFetcher $fetcher,
+        ZipFetcher $fetcher,
+        ModuleVersionChecker $versionChecker,
         StubCopier $copier,
         ManifestWriter $manifest,
         NodeDependencyMerger $nodeDeps,
@@ -40,11 +42,35 @@ class UpdateCommand extends Command
 
         $modules = $registry->resolveWithDependencies($keys);
 
-        $toUpdate = array_filter($modules, fn (array $module) => $files->isDirectory(base_path($module['target'])));
+        $installed = array_filter($modules, fn (array $module) => $files->isDirectory(base_path($module['target'])));
         $notInstalled = array_filter($modules, fn (array $module) => ! $files->isDirectory(base_path($module['target'])));
 
         foreach ($notInstalled as $module) {
             $this->warn("{$module['name']} isn't installed — skipping. Run `wv:install {$module['key']}` first.");
+        }
+
+        // Only fetch the (cheap, single-file) latest version up front, so we
+        // can tell the difference between "nothing to do" and "these modules
+        // are actually changing" before touching the filesystem or prompting.
+        $toUpdate = [];
+        $upToDate = [];
+
+        foreach ($installed as $module) {
+            $target = base_path($module['target']);
+            $installedVersion = $this->installedVersion($files, $target);
+            $latestVersion = $versionChecker->latest($module['repo'], $module['ref'], $module['path']);
+
+            if (! $this->option('force') && $latestVersion !== null && $latestVersion === $installedVersion) {
+                $upToDate[] = $module['name'];
+
+                continue;
+            }
+
+            $toUpdate[] = $module;
+        }
+
+        foreach ($upToDate as $name) {
+            $this->comment("{$name} is already up to date.");
         }
 
         if ($toUpdate === []) {
@@ -71,11 +97,13 @@ class UpdateCommand extends Command
             $target = base_path($module['target']);
 
             $this->info("Fetching {$module['name']} from {$module['repo']}@{$module['ref']}...");
-            $fetched = $fetcher->fetch($module['repo'], $module['ref']);
+            $fetched = $fetcher->fetch($module['repo'], $module['ref'], $module['path']);
 
             try {
+                $version = json_decode($files->get($fetched['path'].'/wv-module.json'), true)['version'] ?? 'unknown';
+
                 $copier->copy($fetched['path'].'/source', $target);
-                $manifest->write($target, $module['key'], $fetched['commit']);
+                $manifest->write($target, $module['key'], $version);
 
                 $npmDeps = $module['npm'] ? $fetched['path'].'/'.$module['npm'] : null;
 
@@ -88,10 +116,10 @@ class UpdateCommand extends Command
                     "Modules/{$module['name']}/resources/js/app.js",
                 ]);
             } finally {
-                $files->deleteDirectory($fetched['path']);
+                $files->deleteDirectory($fetched['root']);
             }
 
-            $updated[] = $module['name'];
+            $updated[] = "{$module['name']} ({$version})";
         }
 
         Process::run('composer dump-autoload');
@@ -104,5 +132,16 @@ class UpdateCommand extends Command
         $this->info('Updated: '.implode(', ', $updated));
 
         return self::SUCCESS;
+    }
+
+    protected function installedVersion(Filesystem $files, string $target): ?string
+    {
+        $manifestPath = $target.'/.wv-manifest.json';
+
+        if (! $files->exists($manifestPath)) {
+            return null;
+        }
+
+        return json_decode($files->get($manifestPath), true)['version'] ?? null;
     }
 }

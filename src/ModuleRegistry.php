@@ -8,12 +8,12 @@ use InvalidArgumentException;
 class ModuleRegistry
 {
     /**
-     * @var Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, npm: ?string}>|null
+     * @var Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, path: string, npm: ?string}>|null
      */
     protected ?Collection $modules = null;
 
     /**
-     * @param  array<string, array{name: string, description?: string, depends_on?: array<int, string>, target: string, repo: string, ref?: string, npm?: string}>  $config
+     * @param  array{repo: string, ref: string, modules: array<string, array{name: string, description?: string, depends_on?: array<int, string>, target: string, path: string, repo?: string, ref?: string, npm?: string}>}  $config
      */
     public function __construct(protected array $config) {}
 
@@ -22,7 +22,7 @@ class ModuleRegistry
      * Adding a new module later is adding an entry here — nothing else to
      * register centrally.
      *
-     * @return Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, npm: ?string}>
+     * @return Collection<string, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, path: string, npm: ?string}>
      */
     public function all(): Collection
     {
@@ -30,14 +30,18 @@ class ModuleRegistry
             return $this->modules;
         }
 
-        return $this->modules = collect($this->config)
+        $defaultRepo = $this->config['repo'];
+        $defaultRef = $this->config['ref'];
+
+        return $this->modules = collect($this->config['modules'] ?? [])
             ->map(fn (array $module, string $key) => [
                 'key' => $key,
                 'name' => $module['name'],
                 'description' => $module['description'] ?? '',
                 'depends_on' => $module['depends_on'] ?? [],
-                'repo' => $module['repo'],
-                'ref' => $module['ref'] ?? 'main',
+                'repo' => $module['repo'] ?? $defaultRepo,
+                'ref' => $module['ref'] ?? $defaultRef,
+                'path' => $module['path'],
                 'target' => $module['target'],
                 'npm' => $module['npm'] ?? null,
             ]);
@@ -54,7 +58,7 @@ class ModuleRegistry
      * `wv:install auth` also pulls in `core` first once Auth ships.
      *
      * @param  array<int, string>  $keys
-     * @return array<int, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, npm: ?string}>
+     * @return array<int, array{key: string, name: string, description: string, depends_on: array<int, string>, target: string, repo: string, ref: string, path: string, npm: ?string}>
      */
     public function resolveWithDependencies(array $keys): array
     {

@@ -9,9 +9,9 @@ use Wv\ModuleInstallerKit\ModuleRegistry;
 use Wv\ModuleInstallerKit\Support\ComposerConfigPatcher;
 use Wv\ModuleInstallerKit\Support\ManifestWriter;
 use Wv\ModuleInstallerKit\Support\NodeDependencyMerger;
-use Wv\ModuleInstallerKit\Support\RepositoryFetcher;
 use Wv\ModuleInstallerKit\Support\StubCopier;
 use Wv\ModuleInstallerKit\Support\ViteConfigPatcher;
+use Wv\ModuleInstallerKit\Support\ZipFetcher;
 
 class InstallCommand extends Command
 {
@@ -20,11 +20,11 @@ class InstallCommand extends Command
         {--all : Install every module this package knows about}
         {--force : Overwrite the module directory if it already exists}';
 
-    protected $description = "Fetch one or more Wv modules from their GitHub repos and copy them into this app's Modules/ directory";
+    protected $description = "Fetch one or more Wv modules and copy them into this app's Modules/ directory";
 
     public function handle(
         ModuleRegistry $registry,
-        RepositoryFetcher $fetcher,
+        ZipFetcher $fetcher,
         StubCopier $copier,
         ManifestWriter $manifest,
         NodeDependencyMerger $nodeDeps,
@@ -59,11 +59,13 @@ class InstallCommand extends Command
             }
 
             $this->info("Fetching {$module['name']} from {$module['repo']}@{$module['ref']}...");
-            $fetched = $fetcher->fetch($module['repo'], $module['ref']);
+            $fetched = $fetcher->fetch($module['repo'], $module['ref'], $module['path']);
 
             try {
+                $version = json_decode($files->get($fetched['path'].'/wv-module.json'), true)['version'] ?? 'unknown';
+
                 $copier->copy($fetched['path'].'/source', $target);
-                $manifest->write($target, $module['key'], $fetched['commit']);
+                $manifest->write($target, $module['key'], $version);
 
                 $npmDeps = $module['npm'] ? $fetched['path'].'/'.$module['npm'] : null;
 
@@ -76,7 +78,7 @@ class InstallCommand extends Command
                     "Modules/{$module['name']}/resources/js/app.js",
                 ]);
             } finally {
-                $files->deleteDirectory($fetched['path']);
+                $files->deleteDirectory($fetched['root']);
             }
 
             $this->markModuleEnabled($module['name']);

@@ -6,11 +6,11 @@ Each module lives in its own GitHub repo (e.g. [`wv-core-module`](https://github
 
 ## Requirements
 
-- The module repos are cloned over `git`, so the machine running these commands needs working GitHub credentials (SSH key or a cached HTTPS credential) with access to each module's repo.
+- Both this package's repo and every module repo it fetches (e.g. `wv-core-module`) are **public**. No GitHub token or SSH key is needed anywhere — Composer and `git clone` both work anonymously.
 
 ## Installing this package in a host Laravel app
 
-This package itself is a private GitHub repo, not on Packagist, so a host app needs a `vcs` repository entry pointing at it before `composer require` will find it.
+This package isn't on Packagist, so a host app needs a one-time `vcs` repository entry pointing at it before `composer require` will find it — nothing beyond that, no auth setup.
 
 1. Add the repository to the host app's `composer.json`:
 
@@ -23,13 +23,7 @@ This package itself is a private GitHub repo, not on Packagist, so a host app ne
     ]
     ```
 
-2. Since the repo is private, Composer needs its own GitHub token (separate from `git`'s cached credential — Composer doesn't read the macOS Keychain). Generate a token with `repo` scope (or a fine-grained token scoped to at least `wv-module-installer-kit` and every module repo it'll fetch) and register it once per machine:
-
-    ```bash
-    composer config --global github-oauth.github.com <your-token>
-    ```
-
-3. Require the package. There are no tagged releases yet, so pin the branch directly:
+2. Require the package. There are no tagged releases yet, so pin the branch directly:
 
     ```bash
     composer require wv/module-installer-kit:dev-main
@@ -97,4 +91,51 @@ Re-fetches the latest commit on each module's tracked ref and **completely overw
 # Update one module
 php artisan wv:update core
 
-# Update eve
+# Update everything currently installed
+php artisan wv:update --all
+```
+
+| Option | Effect |
+|---|---|
+| `--all` | Update every installed module instead of naming keys |
+| `--force` | Skip the "this will overwrite local edits" confirmation prompt |
+
+### Removing a module
+
+There's no `wv:remove` command yet — to remove a module today, delete `Modules/{Name}` yourself and drop its entry from `modules_statuses.json`. Ask if you want an automated `wv:remove` added.
+
+## Registering a module
+
+Modules are declared in [`config/wv-modules.php`](config/wv-modules.php), keyed by module slug:
+
+```php
+'core' => [
+    'name' => 'Core',
+    'description' => 'Shared UI kit, design tokens, layouts, and Alpine.js components every other Wv module builds on.',
+    'depends_on' => [],                                        // other module keys required first
+    'repo' => 'https://github.com/savsani/wv-core-module.git',
+    'ref' => 'main',                                            // branch or tag to track
+    'target' => 'Modules/Core',                                 // where it's copied to in the host app
+    'npm' => 'package.deps.json',                               // npm deps file at the repo root, or null
+],
+```
+
+A consuming app can publish and override this file to pin a module to a specific tag, add a private fork, or register a module this package doesn't know about yet:
+
+```bash
+php artisan vendor:publish --tag=wv-modules-config
+```
+
+### Module repo layout
+
+Each module's own repo mirrors what gets copied:
+
+```
+package.deps.json   # optional — npm deps merged into the host's package.json
+source/              # copied verbatim into Modules/{Name}
+  module.json
+  composer.json
+  app/
+  resources/
+  ...
+```

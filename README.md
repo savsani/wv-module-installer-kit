@@ -8,7 +8,7 @@ Adding module #51 later means adding a folder to `wv-modules` — never a new re
 
 ## Requirements
 
-- Both this package's repo and `wv-modules` are **public**. No GitHub token, SSH key, or `git` binary is needed anywhere — module content is fetched with a plain HTTPS GET and extracted with PHP's `ext-zip`.
+- Both this package's repo and `wv-modules` are **public** — module content is fetched with a plain HTTPS GET and extracted with PHP's `ext-zip`.
 
 ## Installing this package in a host Laravel app
 
@@ -30,6 +30,14 @@ This package isn't on Packagist, so a host app needs a one-time `vcs` repository
     ```bash
     composer require --dev wv/module-installer-kit:dev-main
     ```
+
+    This also pulls in `nwidart/laravel-modules` and, transitively, `wikimedia/composer-merge-plugin`. Composer will ask you to approve that plugin:
+
+    ```
+    Do you trust "wikimedia/composer-merge-plugin" to execute code and wish to enable it now? (writes "allow-plugins" to composer.json) [y,n,d,?]
+    ```
+
+    Type `y`. This plugin is what lets each module's own `composer.json` (PSR-4 autoload mapping, etc.) get merged into the host app once it's copied into `Modules/`.
 
 That's it — `wv:install`, `wv:update`, and `wv:list` are now available via `php artisan`. Because it's `require-dev`, `composer install --no-dev` in production skips it entirely.
 
